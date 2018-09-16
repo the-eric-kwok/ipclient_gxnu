@@ -8,15 +8,15 @@ server="172.16.1.1"
 echo "Server:" $server
 ##Mac Address(should upcase)## 
 ##If you know your MAC address, you can set ip address manually##
-mac="FF:FF:FF:FF:FF:FF"
+#mac="FF:FF:FF:FF:FF:FF"
 ##Or you can get MAC address from command 'ifconfig' automatically， but you must know interface##
-mac=$(ifconfig eth0.2 | grep " HWaddr" | awk -F" " '{print $5}')
+mac=$(ifconfig eno1 | grep "ether " | awk '{print $2}')
 echo "MAC Address:" $mac
 ##Ip address##
 ##If you know your ip address, you can set ip address manually##
-ipadd="192.168.22.1"
+#ipadd="192.168.22.1"
 ##Or you can get ip address from command 'ifconfig' automatically， but you must know interface##
-ipadd=$(ifconfig eth0.2 | grep "inet addr" | awk '{ print $2}'| awk -F: '{print $2}')
+ipadd=$(ifconfig eno1 | grep "inet " | awk '{ print $2}')
 echo "Local IP Address:" $ipadd
 ##Isp vendor China Unicom:01 China Telecom:02 China Mobile:03##
 isp=01 
@@ -72,21 +72,23 @@ ispKey=1315423911  #1315423911 0x4e67c6a7
 localInfo[0]=97
 nmac=${#mac}
 nInfo=${#localInfo[@]}
+
 ipaddress=(00 00 00 00)
 fff=(${ipadd//./ })
-for((i=0;i<4;i++))
-do
-ipaddress[i]=${fff[i]}
+for((i=0;i<4;i++)); do
+  ipaddress[i]=${fff[i]}
 done
-for((i=0;i<4;i++))
-do
-localInfo[i+30]=${ipaddress[i]}
+for((i=0;i<4;i++)); do
+  localInfo[i+30]=${ipaddress[i]}  #IP Address
 done
-for((i=0;i<nmac;i++))
-do
-localInfo[i+34]=$(c2ascll ${mac:$i:1})
+
+for((i=0;i<nmac;i++)); do
+  localInfo[i+34]=$(c2ascll ${mac:$i:1})  #MAC Address
 done
-localInfo[54]=$isp
+localInfo[54]=$isp  #ISP
+localInfo[55]=0  #Request to PPPoE
+
+# Get Key Numbers
 ESI=0
 EBX=0
 ECX=0
@@ -118,17 +120,18 @@ let "ECX=ECX&0x7FFFFFFF"
 for((i=0;i<4;i++))
 do
     let "keypart=((ECX>>(i*8))&0x000000FF)"
-    localInfo[$nInfo-4+i]=$keypart
+    localInfo[$nInfo-4+i]=$keypart  #Key Numbers
 done
 data=''
 for((i=0;i<$nInfo;i++))
 do
-z=$(dec2hex ${localInfo[i]})
+z=$(dec2hex ${localInfo[i]})  #Cover Dec to Hex
 if [ ${#z} -lt 2 ]; then
   z="0"$z
 fi
 data=$data"\\x"$z
 done
 echo $data
-echo -n -e ${data}| socat - udp4-datagram:$server:20015
-echo "OK..."
+echo -n -e ${data}| socat - udp4-datagram:$server:20015  #Send it!
+echo
+echo "OK...All done!!"

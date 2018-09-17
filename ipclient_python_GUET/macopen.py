@@ -1,32 +1,8 @@
 #!/usr/bin/env python
 # coding=utf-8 ##
-################This is MAC OPEN TOOLS  Version 1.0###################
-################Only for GUET###########################
-import socket
-import uuid
-
-server='172.16.1.1'  #GUET 172.16.1.1  GXNU 202.193.160.123
+import socket,numpy
+server='172.16.1.1'
 addr=(server,20015)
-
-def get_ip():
-    try:
-        s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
-        ip = s.getsockname()[0]
-    finally:
-        s.close()
-    return ip
-
-def get_mac():
-    mac=uuid.UUID(int = uuid.getnode()).hex[-12:]
-    return ':'.join([mac[e:e+2] for e in range(0,11,2)])
-
-def int_overflow(val):
-    maxint = 2147483647
-    if not -maxint-1 <= val <= maxint:
-        val = (val + (maxint + 1)) % (2 * (maxint + 1)) - maxint - 1
-    return val
-
 def send_handshake(mac,ip,isp):
  localInfo=bytearray([0x00,0x00,0x00,0x00,0x00,0x00,
                          0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -39,7 +15,7 @@ def send_handshake(mac,ip,isp):
  s1=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
  s1.connect(addr)
  ispKey=0x4e67c6a7
- localInfo[0]=0x61
+ localInfo[0]='1'
  nmac=len(mac)
  nInfo=len(localInfo)
  ipaddress=[0,0,0,0]
@@ -51,8 +27,8 @@ def send_handshake(mac,ip,isp):
   localInfo[i+30]=ipaddress[i]
  print(nInfo)
  for i in range(0,nmac):
-  localInfo[i+34]=ord(mac[i])
- localInfo[54]=isp
+  localInfo[i+34]=mac[i]
+  localInfo[54]=isp
 #----------------
  ESI=int(0)
  EBX=int(0)
@@ -61,7 +37,7 @@ def send_handshake(mac,ip,isp):
  ECX=int(ispKey)
  for i in range(0,nInfo-4):
     ESI=ECX
-    ESI=int_overflow(ECX<<5)
+    ESI=numpy.int32(ECX<<5)
     if (ECX>0):
       EBX=ECX
       EBX=ECX>>2
@@ -70,7 +46,7 @@ def send_handshake(mac,ip,isp):
       EBX=ECX>>2
       EBX=EBX|(0xC0000000)
     ESI=ESI+int(localInfo[i])
-    EBX=int_overflow(EBX+ESI)
+    EBX=numpy.int32(EBX+ESI)
     ECX=ECX^EBX
  ECX=ECX&(0x7FFFFFFF)
 
@@ -79,16 +55,16 @@ def send_handshake(mac,ip,isp):
   localInfo[nInfo-(4-i)]=keypart
  s1.send(localInfo)
 
+def get_local_ip(ifname):
+ s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+ inet = fcntl.ioctl(s.fileno(), 0x8915, struct.pack('256s', ifname[:15]))
+ ret = socket.inet_ntoa(inet[20:24])
+ return ret
+
 if __name__=="__main__":
-    #mac="98:e7:f4:53:d9:08"
-    mac = get_mac()
-    #ip="10.21.123.64" ##!!!!ip is local machine's ip address but not router's ip
-    try:
-        ip = get_ip()
-    except OSError as e:
-        print('无网络连接，请检查您的网线是否插好')
-        exit(1)
-    isp = 0x02
+    mac="98:e7:f4:53:d9:08"
+    ip="172.16.54.205" ##ip is local machine's ip address but not router's ip address
+    isp=0x01
     ###isp  0x01(China Unicom)  0x02(China Telecom)  0x03(China Mobile) ###
     send_handshake(mac,ip,isp)
     exit
